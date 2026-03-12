@@ -29,7 +29,7 @@ function offsetWeek(weekStart, delta) {
 }
 
 export default function TimeLog() {
-  const { entries, users, status, errorMsg, mappings } = useTimeData();
+  const { entries, users, status, errorMsg, mappings, refresh } = useTimeData();
 
   const [productFilter, setProductFilter] = useState('');
   const [personFilter,  setPersonFilter]  = useState('');
@@ -55,8 +55,7 @@ export default function TimeLog() {
     return entries.filter(e => {
       if (productFilter && e.productName !== productFilter) return false;
       if (personFilter  && e.userId      !== personFilter)  return false;
-      if (!allTime) {
-        if (!e.startedAt) return false; // undated entries hidden when week filter is active
+      if (!allTime && e.startedAt) {
         const d = new Date(e.startedAt);
         if (d < weekStart || d >= weekEnd) return false;
       }
@@ -92,7 +91,17 @@ export default function TimeLog() {
   return (
     <div style={{ padding: 24, fontFamily: 'system-ui,-apple-system,sans-serif', maxWidth: 1200, margin: '0 auto' }}>
       <div style={{ marginBottom: 20 }}>
-        <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#1e293b' }}>Hours Logged</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#1e293b' }}>Hours Logged</h1>
+          <button
+            onClick={refresh}
+            disabled={status === 'loading'}
+            title="Re-fetch data from Monday.com"
+            style={{ padding: '5px 12px', border: '1px solid #e2e8f0', borderRadius: 6, background: 'white', fontSize: 12, cursor: status === 'loading' ? 'not-allowed' : 'pointer', color: '#64748b', opacity: status === 'loading' ? 0.5 : 1 }}
+          >
+            {status === 'loading' ? 'Loading…' : 'Refresh'}
+          </button>
+        </div>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: '#64748b' }}>
           Time tracked by team members across mapped Monday.com boards.
         </p>

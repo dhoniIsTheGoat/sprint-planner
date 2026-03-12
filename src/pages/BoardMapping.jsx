@@ -41,11 +41,7 @@ export default function BoardMapping() {
         const ALLOWED = new Set(['Connect', 'CRM', 'Prime UI', 'Standalone Products', 'Support', 'Deployments']);
         const filtered = b.filter(b =>
           ALLOWED.has(b.workspace?.name) &&
-          !/^subitems/i.test(b.name) &&
-          (
-            /[\s-](dev|testing)$/i.test(b.name) ||
-            (b.workspace?.name === 'Connect' && /deployment/i.test(b.name))
-          )
+          !/^subitems/i.test(b.name)
         );
         setBoards(filtered);
 

@@ -115,6 +115,50 @@ export async function fetchNextPage(cursor, timeColId, peopleColId) {
   return data.next_items_page || { items: [] };
 }
 
+export async function debugFetchItem(itemId) {
+  const query = `query ($id: [ID!]!) {
+    items(ids: $id) {
+      id
+      name
+      state
+      board { id name }
+      group { title }
+      column_values {
+        id
+        type
+        text
+        value
+        ... on TimeTrackingValue {
+          duration
+          history {
+            started_user_id
+            started_at
+            ended_at
+            status
+          }
+        }
+      }
+    }
+  }`;
+  const data = await mondayQuery(query, { id: [String(itemId)] });
+  const item = data.items?.[0];
+  if (!item) { console.warn('Item not found:', itemId); return null; }
+  console.group(`Item: ${item.name} (${item.id}) — state: ${item.state}`);
+  console.log('Board:', item.board?.name, '| Group:', item.group?.title);
+  console.table(item.column_values.map(c => ({
+    id: c.id, type: c.type, text: c.text,
+    hasValue: !!c.value, duration: c.duration ?? '—',
+    historyCount: c.history?.length ?? '—',
+  })));
+  console.groupEnd();
+  return item;
+}
+
+// Expose on window for quick console debugging
+if (typeof window !== 'undefined') {
+  window.__debugMondayItem = (itemId) => debugFetchItem(itemId).catch(console.error);
+}
+
 export async function fetchUsers() {
   const cacheKey = 'mondayUsersCache';
   try {

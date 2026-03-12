@@ -73,25 +73,39 @@ function emitEntries(taskName, groupTitle, timeCol, peopleColValue, boardName, p
   });
 
   if (history.length > 0) {
-    const entries = [];
+    const timedEntries = [];
+    const manualUserIds = new Set(); // users who logged time manually (no timestamps)
+
     history.forEach(session => {
       if (!session.started_user_id) return;
       const uid   = String(session.started_user_id);
       const start = session.started_at ? new Date(session.started_at) : null;
       const end   = session.ended_at   ? new Date(session.ended_at)   : null;
-      const secs  = (start && end) ? (end - start) / 1000 : 0;
-      if (secs <= 0) return;
-      entries.push({
-        ...base,
-        ...makeUser(uid),
-        hours:     parseFloat((secs / 3600).toFixed(2)),
-        startedAt: session.started_at || null,
-      });
+      const secs  = (start && end) ? Math.max(0, (end - start) / 1000) : 0;
+      if (secs > 0) {
+        timedEntries.push({
+          ...base, ...makeUser(uid),
+          hours:     parseFloat((secs / 3600).toFixed(2)),
+          startedAt: session.started_at || null,
+        });
+      } else {
+        // Manually entered time — record the user, distribute total at the end
+        manualUserIds.add(uid);
+      }
     });
-    if (entries.length > 0) return entries;
+
+    if (timedEntries.length > 0) return timedEntries;
+
+    // All sessions were manually entered — split total evenly across users
+    if (manualUserIds.size > 0) {
+      const perUser = parseFloat((total / 3600 / manualUserIds.size).toFixed(2));
+      return [...manualUserIds].map(uid => ({
+        ...base, ...makeUser(uid), hours: perUser, startedAt: null,
+      }));
+    }
   }
 
-  // Fallback: no detailed history — attribute total to assigned person(s)
+  // Fallback: no history at all — attribute total to assigned person(s)
   const personIds = parsePeopleValue(peopleColValue);
   const hours = parseFloat((total / 3600).toFixed(2));
   if (personIds.length > 0) {
@@ -104,16 +118,20 @@ function emitEntries(taskName, groupTitle, timeCol, peopleColValue, boardName, p
 function aggregateItems(items, timeColId, peopleColId, boardName, productName, userMap) {
   const entries = [];
 
+  const PEOPLE_TYPES = ['people', 'board-owner', 'team', 'owner'];
+  const findPeopleCV = cvs => cvs?.find(c => c.id === peopleColId)
+    ?? cvs?.find(c => PEOPLE_TYPES.includes(c.type));
+
   items.forEach(item => {
     const timeCV   = item.column_values?.find(c => c.id === timeColId || c.type === 'time_tracking');
-    const peopleCV = item.column_values?.find(c => c.id === peopleColId || c.type === 'people');
+    const peopleCV = findPeopleCV(item.column_values);
     if (timeCV && (timeCV.value || timeCV.duration)) {
       entries.push(...emitEntries(item.name, item.group?.title || '', timeCV, peopleCV?.value, boardName, productName, userMap));
     }
 
     (item.subitems || []).forEach(sub => {
       const subTimeCV   = sub.column_values?.find(c => c.type === 'time_tracking');
-      const subPeopleCV = sub.column_values?.find(c => c.type === 'people');
+      const subPeopleCV = findPeopleCV(sub.column_values);
       if (subTimeCV && (subTimeCV.value || subTimeCV.duration)) {
         const taskName = `${item.name} › ${sub.name}`;
         entries.push(...emitEntries(taskName, item.group?.title || '', subTimeCV, subPeopleCV?.value, boardName, productName, userMap));
@@ -138,17 +156,21 @@ async function fetchAllItems(boardId, timeColId, peopleColId) {
 }
 
 export function useTimeData() {
-  const [entries,  setEntries]  = useState([]);
-  const [users,    setUsers]    = useState([]);
-  const [status,   setStatus]   = useState('idle');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [mappings, setMappings] = useState({});
+  const [entries,    setEntries]    = useState([]);
+  const [users,      setUsers]      = useState([]);
+  const [status,     setStatus]     = useState('idle');
+  const [errorMsg,   setErrorMsg]   = useState('');
+  const [mappings,   setMappings]   = useState({});
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const refresh = () => { setEntries([]); setStatus('idle'); setRefreshKey(k => k + 1); };
 
   useEffect(() => {
     const maps = loadMappings();
     setMappings(maps);
 
     const mappedBoards = Object.entries(maps).filter(([, v]) => v.productName);
+    console.log('[useTimeData] boards to fetch:', mappedBoards.map(([id, { boardName }]) => `${boardName} (${id})`));
     if (mappedBoards.length === 0) { setStatus('ready'); return; }
 
     setStatus('loading');
@@ -163,9 +185,15 @@ export function useTimeData() {
         await Promise.all(mappedBoards.map(async ([boardId, { boardName, productName }]) => {
           try {
             const columns   = await fetchBoardColumns(boardId);
-            const timeCol   = columns.find(c => c.type === 'time_tracking');
-            const peopleCol = columns.find(c => c.type === 'people');
+            console.log(`[${boardName}] columns:`, columns.map(c => `${c.title} (${c.type})`));
+
+            const timeCol = columns.find(c => c.type === 'time_tracking');
             if (!timeCol) { console.log(`Board "${boardName}" has no time_tracking column — skipping.`); return; }
+
+            // Match people column by type first, then fall back to title keywords
+            const PEOPLE_TYPES = ['people', 'board-owner', 'team', 'owner'];
+            const peopleCol = columns.find(c => PEOPLE_TYPES.includes(c.type))
+              ?? columns.find(c => /owner|assignee|person|member/i.test(c.title));
             const items = await fetchAllItems(boardId, timeCol.id, peopleCol?.id || '');
             allEntries.push(...aggregateItems(items, timeCol.id, peopleCol?.id || '', boardName, productName, userMap));
           } catch (err) {
@@ -192,7 +220,7 @@ export function useTimeData() {
     };
 
     run();
-  }, []);
+  }, [refreshKey]);
 
-  return { entries, users, status, errorMsg, mappings };
+  return { entries, users, status, errorMsg, mappings, refresh };
 }
