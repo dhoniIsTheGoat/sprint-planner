@@ -4,6 +4,7 @@ const NAV_LINKS = [
   { to: '/',              label: 'Sprint Planner' },
   { to: '/board-mapping', label: 'Board Mapping'  },
   { to: '/time-log',      label: 'Hours Logged'   },
+  { to: '/dashboard',     label: 'Dashboard'      },
   { to: '/setup',         label: 'Setup'          },
 ];
 

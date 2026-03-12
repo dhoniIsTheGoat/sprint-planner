@@ -159,6 +159,73 @@ if (typeof window !== 'undefined') {
   window.__debugMondayItem = (itemId) => debugFetchItem(itemId).catch(console.error);
 }
 
+const DASHBOARD_WORKSPACES = new Set(['Connect', 'Support', 'Standalone Products', 'Stand Alone Products']);
+
+export async function fetchDashboardBoards() {
+  const query = `query {
+    boards(limit: 500) {
+      id
+      name
+      workspace { id name }
+    }
+  }`;
+  const data = await mondayQuery(query);
+  return (data.boards || [])
+    .filter(b =>
+      DASHBOARD_WORKSPACES.has(b.workspace?.name) &&
+      b.name.endsWith('Project Board') &&
+      !b.name.startsWith('Subitems of')
+    )
+    .map(b => ({ id: b.id, name: b.name, workspaceName: b.workspace.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+export async function fetchBoardReleaseData(boardId) {
+  const query = `query ($id: [ID!]!) {
+    boards(ids: $id) {
+      groups { id title }
+      columns { id title type settings_str }
+      items_page(limit: 500) {
+        cursor
+        items {
+          id
+          name
+          group { id }
+          column_values {
+            id
+            type
+            text
+            value
+          }
+        }
+      }
+    }
+  }`;
+  const data = await mondayQuery(query, { id: [boardId] });
+  return data.boards?.[0] || null;
+}
+
+export async function fetchReleaseNextPage(cursor) {
+  const query = `query ($cursor: String!) {
+    next_items_page(limit: 500, cursor: $cursor) {
+      cursor
+      items {
+        id
+        name
+        group { id }
+        column_values {
+          id
+          type
+          text
+          value
+        }
+      }
+    }
+  }`;
+  const data = await mondayQuery(query, { cursor });
+  return data.next_items_page || { items: [] };
+}
+
 export async function fetchUsers() {
   const cacheKey = 'mondayUsersCache';
   try {
