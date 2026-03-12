@@ -1,5 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { Routes, Route } from "react-router-dom";
 import * as XLSX from "xlsx";
+import NavBar       from "./components/NavBar";
+import BoardMapping from "./pages/BoardMapping";
+import TimeLog      from "./pages/TimeLog";
+import Setup        from "./pages/Setup";
 
 const COLORS = [
   "#6366f1","#f59e0b","#10b981","#3b82f6","#ec4899","#8b5cf6",
@@ -19,7 +24,7 @@ const DEFAULT_PRODUCTS = [
   "Clarity","Prime UI","HMC","Connect","Pay Portal","DSH",
   "Deployments","Equifax Connectors","EWA","SF Pay Connectors",
   "W4","PlanSource","WOTC","PrimeTime Tracking","Overtime Approval",
-  "Misc (Training)","PTO / Holidays"
+  "Misc (Training)","PTO / Holidays","Product Testing"
 ].map((name, i) => ({ id: `p${i + 1}`, name, color: COLORS[i % COLORS.length] }));
 
 const SEED = {
@@ -31,7 +36,7 @@ const SEED = {
 
 /* ── Styles ── */
 const tbl = { width:"100%", borderCollapse:"collapse", background:"white", borderRadius:10, overflow:"hidden", boxShadow:"0 1px 3px rgba(0,0,0,0.06)", fontSize:13 };
-const th  = { padding:"10px 14px", background:"#f1f5f9", fontWeight:600, color:"#475569", textAlign:"center", fontSize:12, borderBottom:"1px solid #e2e8f0", whiteSpace:"nowrap" };
+const th  = { padding:"10px 14px", background:"#f1f5f9", fontWeight:600, color:"#475569", textAlign:"center", fontSize:12, borderBottom:"1px solid #e2e8f0", whiteSpace:"nowrap", position:"sticky", top:0, zIndex:1 };
 const td  = { padding:"10px 14px", borderBottom:"1px solid #f1f5f9", color:"#374151", textAlign:"center" };
 const btn = { padding:"6px 14px", color:"white", border:"none", borderRadius:6, fontSize:13, cursor:"pointer", fontWeight:600 };
 const inp = { padding:"6px 10px", borderRadius:6, border:"1px solid #334155", background:"#1e293b", color:"white", fontSize:13 };
@@ -80,8 +85,22 @@ function parseSheet(ws, resources, products) {
 function loadData() {
   try {
     const raw = localStorage.getItem(SK);
-    return raw ? JSON.parse(raw) : SEED;
+    if (!raw) {
+      persistData(SEED);
+      return SEED;
+    }
+    const stored = JSON.parse(raw);
+    // Merge in any default products that don't exist yet (e.g. newly added ones)
+    const existingNames = new Set((stored.products || []).map(p => p.name));
+    const missing = DEFAULT_PRODUCTS.filter(p => !existingNames.has(p.name));
+    if (missing.length > 0) {
+      const merged = { ...stored, products: [...(stored.products || []), ...missing] };
+      persistData(merged);
+      return merged;
+    }
+    return stored;
   } catch {
+    persistData(SEED);
     return SEED;
   }
 }
@@ -244,14 +263,26 @@ function ImportModal({ d, onImport, onClose }) {
   );
 }
 
-/* ── Main App ── */
+/* ── Root App with routing ── */
 export default function App() {
+  return (
+    <div style={{ fontFamily: "system-ui,-apple-system,sans-serif", minHeight: "100vh", background: "#f8fafc" }}>
+      <NavBar />
+      <Routes>
+        <Route path="/"              element={<SprintPlanner />} />
+        <Route path="/board-mapping" element={<BoardMapping />} />
+        <Route path="/time-log"      element={<TimeLog />} />
+        <Route path="/setup"         element={<Setup />} />
+      </Routes>
+    </div>
+  );
+}
+
+/* ── Sprint Planner (original App) ── */
+function SprintPlanner() {
   const [d, setD]             = useState(() => loadData());
   const [tab, setTab]         = useState("plan");
   const [ns, setNs]           = useState({ show: false, name: "", start: "", end: "" });
-  const [newRes, setNewRes]   = useState({ name: "", capacity: "80" });
-  const [newProd, setNewProd] = useState({ name: "" });
-  const [colorIdx, setColorIdx] = useState(0);
   const [showImport, setShowImport] = useState(false);
 
   const save = useCallback(nd => {
@@ -289,30 +320,16 @@ export default function App() {
     setNs({ show: false, name: "", start: "", end: "" });
   };
 
-  const addResource = () => {
-    if (!newRes.name.trim()) return;
-    save({ ...d, resources: [...d.resources, { id: uid(), name: newRes.name.trim(), capacity: parseInt(newRes.capacity) || 80 }] });
-    setNewRes({ name: "", capacity: "80" });
-  };
-
-  const addProduct = () => {
-    if (!newProd.name.trim()) return;
-    save({ ...d, products: [...d.products, { id: uid(), name: newProd.name.trim(), color: COLORS[colorIdx] }] });
-    setColorIdx((colorIdx + 1) % COLORS.length);
-    setNewProd({ name: "" });
-  };
-
   const TABS = [
     { id: "plan",    label: "📋 Plan" },
     { id: "summary", label: "📊 Summary" },
     { id: "actuals", label: "✅ Actuals" },
-    { id: "setup",   label: "⚙️ Setup" },
   ];
 
   const shared = { d, sprint, getA, setA, rTotal, pTotal, grand };
 
   return (
-    <div style={{ fontFamily:"system-ui,-apple-system,sans-serif", minHeight:"100vh", background:"#f8fafc" }}>
+    <div>
       {showImport && <ImportModal d={d} onImport={handleImport} onClose={() => setShowImport(false)} />}
 
       {/* Header */}
@@ -356,7 +373,7 @@ export default function App() {
       </div>
 
       {/* Tabs */}
-      <div style={{ background:"white", borderBottom:"1px solid #e2e8f0", display:"flex" }}>
+      <div style={{ background:"white", borderBottom:"1px solid #e2e8f0", display:"flex", position:"sticky", top:46, zIndex:90 }}>
         {TABS.map(t => (
           <button key={t.id} onClick={() => setTab(t.id)} style={{
             padding:"12px 20px", border:"none", background:"transparent", cursor:"pointer", fontSize:13,
@@ -372,13 +389,6 @@ export default function App() {
         {tab === "plan"    && <PlanTab    {...shared} />}
         {tab === "summary" && <SummaryTab {...shared} />}
         {tab === "actuals" && <ActualsTab {...shared} />}
-        {tab === "setup"   && (
-          <SetupTab d={d} save={save}
-            newRes={newRes} setNewRes={setNewRes} addResource={addResource}
-            newProd={newProd} setNewProd={setNewProd} addProduct={addProduct}
-            colorIdx={colorIdx} setColorIdx={setColorIdx}
-          />
-        )}
       </div>
     </div>
   );
@@ -409,7 +419,7 @@ function PlanTab({ d, sprint, getA, setA, rTotal, pTotal, grand }) {
           </div>
         </div>
       </div>
-      <div style={{ overflowX:"auto" }}>
+      <div style={{ overflow:"auto", maxHeight:"calc(100vh - 230px)" }}>
         <table style={tbl}>
           <thead>
             <tr>
@@ -497,7 +507,7 @@ function SummaryTab({ d, sprint, getA, rTotal, pTotal, grand }) {
         ))}
       </div>
       <h3 style={{ fontSize:12, fontWeight:700, color:"#94a3b8", marginBottom:12, textTransform:"uppercase", letterSpacing:"0.5px" }}>Resource Breakdown</h3>
-      <div style={{ overflowX:"auto" }}>
+      <div style={{ overflow:"auto", maxHeight:"calc(100vh - 230px)" }}>
         <table style={tbl}>
           <thead>
             <tr>
@@ -548,7 +558,7 @@ function ActualsTab({ d, sprint, getA, setA, rTotal, pTotal, grand }) {
           <strong style={{ color: gDiff > 0 ? "#dc2626" : gDiff < 0 ? "#16a34a" : "#64748b" }}>{gDiff > 0 ? "+" : ""}{gDiff}h</strong>
         </div>
       </div>
-      <div style={{ overflowX:"auto" }}>
+      <div style={{ overflow:"auto", maxHeight:"calc(100vh - 230px)" }}>
         <table style={tbl}>
           <thead>
             <tr>
@@ -616,66 +626,3 @@ function ActualsTab({ d, sprint, getA, setA, rTotal, pTotal, grand }) {
 }
 
 /* ── Setup Tab ── */
-function SetupTab({ d, save, newRes, setNewRes, addResource, newProd, setNewProd, addProduct, colorIdx, setColorIdx }) {
-  return (
-    <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:24, maxWidth:900 }}>
-      <div>
-        <h3 style={{ margin:"0 0 14px", fontSize:15, fontWeight:700, color:"#1e293b" }}>👤 Resources</h3>
-        <div style={{ background:"white", borderRadius:10, border:"1px solid #e2e8f0", overflow:"hidden" }}>
-          {d.resources.length === 0 && <div style={{ padding:16, textAlign:"center", color:"#94a3b8", fontSize:13 }}>No resources added yet</div>}
-          {d.resources.map(r => (
-            <div key={r.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 16px", borderBottom:"1px solid #f1f5f9" }}>
-              <div>
-                <div style={{ fontWeight:600, fontSize:14, color:"#1e293b" }}>{r.name}</div>
-                <div style={{ fontSize:12, color:"#94a3b8" }}>{r.capacity}h / sprint</div>
-              </div>
-              <button onClick={() => save({ ...d, resources: d.resources.filter(x => x.id !== r.id) })}
-                style={{ background:"none", border:"none", color:"#ef4444", cursor:"pointer", fontSize:18, lineHeight:1, padding:"4px 8px" }}>×</button>
-            </div>
-          ))}
-          <div style={{ padding:12, display:"flex", gap:8, background:"#f8fafc", alignItems:"center" }}>
-            <input placeholder="Full name" value={newRes.name} onChange={e => setNewRes({ ...newRes, name: e.target.value })}
-              onKeyDown={e => e.key === "Enter" && addResource()}
-              style={{ flex:1, padding:"6px 10px", border:"1px solid #e2e8f0", borderRadius:6, fontSize:13, outline:"none" }} />
-            <input type="number" placeholder="Hours" value={newRes.capacity} onChange={e => setNewRes({ ...newRes, capacity: e.target.value })}
-              style={{ width:76, padding:"6px 10px", border:"1px solid #e2e8f0", borderRadius:6, fontSize:13, outline:"none" }} />
-            <button onClick={addResource} style={{ ...btn, background:"#6366f1", padding:"6px 12px" }}>Add</button>
-          </div>
-        </div>
-      </div>
-      <div>
-        <h3 style={{ margin:"0 0 14px", fontSize:15, fontWeight:700, color:"#1e293b" }}>📦 Products</h3>
-        <div style={{ background:"white", borderRadius:10, border:"1px solid #e2e8f0", overflow:"hidden" }}>
-          {d.products.length === 0 && <div style={{ padding:16, textAlign:"center", color:"#94a3b8", fontSize:13 }}>No products added yet</div>}
-          {d.products.map(p => (
-            <div key={p.id} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", padding:"10px 16px", borderBottom:"1px solid #f1f5f9" }}>
-              <div style={{ display:"flex", alignItems:"center", gap:10 }}>
-                <div style={{ width:12, height:12, borderRadius:"50%", background:p.color, flexShrink:0 }} />
-                <div style={{ fontWeight:600, fontSize:14, color:"#1e293b" }}>{p.name}</div>
-              </div>
-              <button onClick={() => save({ ...d, products: d.products.filter(x => x.id !== p.id) })}
-                style={{ background:"none", border:"none", color:"#ef4444", cursor:"pointer", fontSize:18, lineHeight:1, padding:"4px 8px" }}>×</button>
-            </div>
-          ))}
-          <div style={{ padding:12, background:"#f8fafc" }}>
-            <div style={{ display:"flex", gap:8, marginBottom:8, alignItems:"center" }}>
-              <input placeholder="Product name" value={newProd.name} onChange={e => setNewProd({ ...newProd, name: e.target.value })}
-                onKeyDown={e => e.key === "Enter" && addProduct()}
-                style={{ flex:1, padding:"6px 10px", border:"1px solid #e2e8f0", borderRadius:6, fontSize:13, outline:"none" }} />
-              <button onClick={addProduct} style={{ ...btn, background:"#6366f1", padding:"6px 12px" }}>Add</button>
-            </div>
-            <div style={{ display:"flex", gap:5, flexWrap:"wrap", marginTop:4 }}>
-              {COLORS.map((c, i) => (
-                <div key={c} onClick={() => setColorIdx(i)} style={{
-                  width:22, height:22, borderRadius:"50%", background:c, cursor:"pointer",
-                  border:`2px solid ${colorIdx === i ? "#1e293b" : "transparent"}`,
-                  boxSizing:"border-box", transform: colorIdx === i ? "scale(1.2)" : "scale(1)", transition:"transform 0.1s"
-                }} />
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
