@@ -3,20 +3,97 @@ import { useDashboardData } from '../hooks/useDashboardData';
 import WorkspaceCard from '../components/WorkspaceCard';
 import BoardCard from '../components/BoardCard';
 
+function ExpandedWorkspace({ workspace, hideCompleted, onClose }) {
+  const { name, color, boards } = workspace;
+
+  const totalTasks     = boards.reduce((s, b) => s + b.releases.reduce((rs, r) => rs + r.total, 0), 0);
+  const completedTasks = boards.reduce((s, b) => s + b.releases.reduce((rs, r) => rs + r.completedCount, 0), 0);
+  const totalReleases  = boards.reduce((s, b) => s + b.releases.length, 0);
+  const completion     = totalTasks > 0 ? Math.round(completedTasks / totalTasks * 100) : 0;
+
+  const visibleBoards = hideCompleted
+    ? boards.filter(b => b.releases.some(r => r.completion < 100))
+    : boards;
+
+  return (
+    <div style={{ borderRadius: 14, overflow: 'hidden', boxShadow: `0 4px 20px ${color}30`, border: `1px solid ${color}40` }}>
+
+      {/* Full-width colored banner */}
+      <div style={{ background: `linear-gradient(140deg, ${color} 0%, ${color}bb 100%)`, padding: '24px 28px' }}>
+
+        {/* Back button */}
+        <button
+          onClick={onClose}
+          style={{ background: 'rgba(255,255,255,0.15)', border: 'none', borderRadius: 8, padding: '5px 14px', color: 'white', fontSize: 12, fontWeight: 700, cursor: 'pointer', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6 }}
+        >
+          ← All Workspaces
+        </button>
+
+        {/* Name + stats row */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 32, flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '1.2px', marginBottom: 4 }}>Workspace</div>
+            <div style={{ fontSize: 26, fontWeight: 900, color: 'white', marginBottom: 14 }}>{name}</div>
+            {/* Completion bar */}
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 5 }}>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.7)' }}>{completedTasks} of {totalTasks} tasks complete</div>
+                <div style={{ fontSize: 13, fontWeight: 900, color: 'white' }}>{completion}%</div>
+              </div>
+              <div style={{ height: 8, borderRadius: 4, background: 'rgba(255,255,255,0.25)', overflow: 'hidden' }}>
+                <div style={{ width: `${completion}%`, height: '100%', background: 'white', borderRadius: 4, opacity: 0.9 }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Stats */}
+          <div style={{ display: 'flex', gap: 32 }}>
+            {[
+              { label: 'Boards',   value: boards.length  },
+              { label: 'Releases', value: totalReleases  },
+              { label: 'Tasks',    value: totalTasks     },
+              { label: 'Done',     value: completedTasks },
+            ].map(s => (
+              <div key={s.label} style={{ textAlign: 'center' }}>
+                <div style={{ fontSize: 28, fontWeight: 900, color: 'white', lineHeight: 1 }}>{s.value}</div>
+                <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.65)', fontWeight: 600, marginTop: 3 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Board grid section */}
+      <div style={{ background: '#f8fafc', padding: 20 }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.8px', marginBottom: 14, display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ width: 3, height: 14, borderRadius: 2, background: color }} />
+          Project Boards — {visibleBoards.length}
+        </div>
+        {visibleBoards.length === 0 ? (
+          <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8', fontSize: 13 }}>All boards completed.</div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+            {visibleBoards.map(board => (
+              <BoardCard key={board.id} board={board} hideCompleted={hideCompleted} />
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Dashboard() {
   const { workspaces, status, errorMsg, refresh } = useDashboardData();
-  const [expandedWs,   setExpandedWs]   = useState(null);
+  const [expandedWs,    setExpandedWs]   = useState(null);
   const [hideCompleted, setHideCompleted] = useState(false);
+
+  const activeWorkspace = workspaces.find(w => w.name === expandedWs) || null;
 
   const totalBoards    = useMemo(() => workspaces.reduce((s, w) => s + w.boards.length, 0), [workspaces]);
   const totalTasks     = useMemo(() => workspaces.reduce((s, w) => s + w.boards.reduce((bs, b) => bs + b.releases.reduce((rs, r) => rs + r.total, 0), 0), 0), [workspaces]);
   const completedTasks = useMemo(() => workspaces.reduce((s, w) => s + w.boards.reduce((bs, b) => bs + b.releases.reduce((rs, r) => rs + r.completedCount, 0), 0), 0), [workspaces]);
   const overallPct     = totalTasks > 0 ? Math.round(completedTasks / totalTasks * 100) : 0;
-
-  const activeWorkspace = workspaces.find(w => w.name === expandedWs);
-  const visibleBoards   = activeWorkspace
-    ? (hideCompleted ? activeWorkspace.boards.filter(b => b.releases.some(r => r.completion < 100)) : activeWorkspace.boards)
-    : [];
 
   return (
     <div style={{ padding: 24, fontFamily: 'system-ui,-apple-system,sans-serif', maxWidth: 1200, margin: '0 auto' }}>
@@ -76,15 +153,10 @@ VITE_MONDAY_API_TOKEN=your_token_here`}
             ))}
           </div>
 
-          {/* Filter bar */}
+          {/* Filter */}
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#475569', cursor: 'pointer', userSelect: 'none' }}>
-              <input
-                type="checkbox"
-                checked={hideCompleted}
-                onChange={e => setHideCompleted(e.target.checked)}
-                style={{ cursor: 'pointer' }}
-              />
+              <input type="checkbox" checked={hideCompleted} onChange={e => setHideCompleted(e.target.checked)} style={{ cursor: 'pointer' }} />
               Hide completed releases
             </label>
           </div>
@@ -93,46 +165,24 @@ VITE_MONDAY_API_TOKEN=your_token_here`}
             <div style={{ textAlign: 'center', padding: 60, color: '#94a3b8', fontSize: 14 }}>
               No Project Boards found in the configured workspaces.
             </div>
+          ) : activeWorkspace ? (
+            /* ── Expanded workspace view ── */
+            <ExpandedWorkspace
+              workspace={activeWorkspace}
+              hideCompleted={hideCompleted}
+              onClose={() => setExpandedWs(null)}
+            />
           ) : (
-            <>
-              {/* Workspace tile grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16, marginBottom: activeWorkspace ? 20 : 0 }}>
-                {workspaces.map(ws => (
-                  <WorkspaceCard
-                    key={ws.name}
-                    workspace={ws}
-                    hideCompleted={hideCompleted}
-                    isExpanded={expandedWs === ws.name}
-                    onExpand={() => setExpandedWs(expandedWs === ws.name ? null : ws.name)}
-                  />
-                ))}
-              </div>
-
-              {/* Expanded workspace board grid */}
-              {activeWorkspace && (
-                <div style={{ background: '#f8fafc', borderRadius: 12, border: `1px solid ${activeWorkspace.color}30`, padding: 20 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
-                    <div style={{ width: 4, height: 20, borderRadius: 2, background: activeWorkspace.color }} />
-                    <div style={{ fontWeight: 700, fontSize: 15, color: '#1e293b' }}>{activeWorkspace.name}</div>
-                    <div style={{ fontSize: 13, color: '#94a3b8' }}>
-                      {visibleBoards.length} board{visibleBoards.length !== 1 ? 's' : ''}
-                    </div>
-                  </div>
-
-                  {visibleBoards.length === 0 ? (
-                    <div style={{ textAlign: 'center', padding: 32, color: '#94a3b8', fontSize: 13 }}>
-                      All boards completed.
-                    </div>
-                  ) : (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 12 }}>
-                      {visibleBoards.map(board => (
-                        <BoardCard key={board.id} board={board} hideCompleted={hideCompleted} />
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-            </>
+            /* ── Workspace tile grid ── */
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 16 }}>
+              {workspaces.map(ws => (
+                <WorkspaceCard
+                  key={ws.name}
+                  workspace={ws}
+                  onExpand={() => setExpandedWs(ws.name)}
+                />
+              ))}
+            </div>
           )}
         </>
       )}

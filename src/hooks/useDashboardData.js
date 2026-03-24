@@ -54,7 +54,7 @@ function aggregateBoard(boardData) {
 
   const groupStats = {};
   activeGroups.forEach(g => {
-    groupStats[g.id] = { id: g.id, title: g.title, statusCounts: {}, total: 0 };
+    groupStats[g.id] = { id: g.id, title: g.title, statusCounts: {}, total: 0, items: [] };
   });
 
   allItems.forEach(item => {
@@ -68,6 +68,7 @@ function aggregateBoard(boardData) {
     const label = resolveStatusLabel(statusCV, indexToLabel);
     groupStats[gId].statusCounts[label] = (groupStats[gId].statusCounts[label] || 0) + 1;
     groupStats[gId].total++;
+    groupStats[gId].items.push({ id: item.id, name: item.name, statusLabel: label });
   });
 
   const releases = Object.values(groupStats)

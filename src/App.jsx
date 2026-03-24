@@ -5,7 +5,8 @@ import NavBar       from "./components/NavBar";
 import BoardMapping from "./pages/BoardMapping";
 import TimeLog      from "./pages/TimeLog";
 import Setup        from "./pages/Setup";
-import Dashboard    from "./pages/Dashboard";
+import Dashboard      from "./pages/Dashboard";
+import QuarterlyGoals from "./pages/QuarterlyGoals";
 
 const COLORS = [
   "#6366f1","#f59e0b","#10b981","#3b82f6","#ec4899","#8b5cf6",
@@ -273,8 +274,9 @@ export default function App() {
         <Route path="/"              element={<SprintPlanner />} />
         <Route path="/board-mapping" element={<BoardMapping />} />
         <Route path="/time-log"      element={<TimeLog />} />
-        <Route path="/dashboard"     element={<Dashboard />} />
-        <Route path="/setup"         element={<Setup />} />
+        <Route path="/dashboard"        element={<Dashboard />} />
+        <Route path="/quarterly-goals" element={<QuarterlyGoals />} />
+        <Route path="/setup"           element={<Setup />} />
       </Routes>
     </div>
   );

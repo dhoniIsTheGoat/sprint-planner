@@ -226,6 +226,55 @@ export async function fetchReleaseNextPage(cursor) {
   return data.next_items_page || { items: [] };
 }
 
+export async function fetchBoardQuarterlyData(boardId) {
+  const colIds = ['status', 'timerange_mkw81h5p', 'person', 'color_mkw9md68'];
+  const query = `query ($id: [ID!]!) {
+    boards(ids: $id) {
+      id
+      name
+      columns { id title type settings_str }
+      items_page(limit: 500) {
+        cursor
+        items {
+          id
+          name
+          group { id title }
+          column_values(ids: ${JSON.stringify(colIds)}) {
+            id
+            type
+            text
+            value
+          }
+        }
+      }
+    }
+  }`;
+  const data = await mondayQuery(query, { id: [boardId] });
+  return data.boards?.[0] || null;
+}
+
+export async function fetchQuarterlyNextPage(cursor) {
+  const colIds = ['status', 'timerange_mkw81h5p', 'person', 'color_mkw9md68'];
+  const query = `query ($cursor: String!) {
+    next_items_page(limit: 500, cursor: $cursor) {
+      cursor
+      items {
+        id
+        name
+        group { id title }
+        column_values(ids: ${JSON.stringify(colIds)}) {
+          id
+          type
+          text
+          value
+        }
+      }
+    }
+  }`;
+  const data = await mondayQuery(query, { cursor });
+  return data.next_items_page || { items: [] };
+}
+
 export async function fetchUsers() {
   const cacheKey = 'mondayUsersCache';
   try {

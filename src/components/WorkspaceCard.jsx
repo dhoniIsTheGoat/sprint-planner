@@ -1,8 +1,6 @@
-import { useState, useMemo } from 'react';
-import BoardCard from './BoardCard';
-import ReleaseProgressBar from './ReleaseProgressBar';
+import { useMemo } from 'react';
 
-export default function WorkspaceCard({ workspace, hideCompleted, onExpand, isExpanded }) {
+export default function WorkspaceCard({ workspace, onExpand }) {
   const { name, color, boards } = workspace;
 
   const totalTasks = useMemo(() =>
@@ -19,83 +17,63 @@ export default function WorkspaceCard({ workspace, hideCompleted, onExpand, isEx
 
   const completion = totalTasks > 0 ? Math.round(completedTasks / totalTasks * 100) : 0;
 
-  const overallStatusCounts = useMemo(() => {
-    const counts = {};
-    boards.forEach(b => b.releases.forEach(r => {
-      Object.entries(r.statusCounts).forEach(([label, count]) => {
-        counts[label] = (counts[label] || 0) + count;
-      });
-    }));
-    return counts;
-  }, [boards]);
-
-  const mergedColorMap = useMemo(() => {
-    const map = {};
-    boards.forEach(b => Object.assign(map, b.colorMap));
-    return map;
-  }, [boards]);
-
-  const completionColor = completion === 100 ? '#16a34a'
-    : completion >= 60 ? '#f59e0b'
-    : color;
-
   return (
     <div
       onClick={onExpand}
       style={{
-        background: 'white',
-        borderRadius: 12,
-        border: `1px solid ${isExpanded ? color : '#e2e8f0'}`,
-        boxShadow: isExpanded ? `0 0 0 2px ${color}30, 0 4px 12px rgba(0,0,0,0.08)` : '0 1px 4px rgba(0,0,0,0.07)',
-        cursor: 'pointer',
+        borderRadius: 14,
         overflow: 'hidden',
-        display: 'flex',
-        flexDirection: 'column',
-        transition: 'box-shadow 0.15s, border-color 0.15s',
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+        border: '1px solid transparent',
+        cursor: 'pointer',
+        background: `linear-gradient(140deg, ${color} 0%, ${color}bb 100%)`,
+        transition: 'transform 0.15s, box-shadow 0.15s',
       }}
+      onMouseEnter={e => { e.currentTarget.style.transform = 'translateY(-2px)'; e.currentTarget.style.boxShadow = `0 6px 20px ${color}40`; }}
+      onMouseLeave={e => { e.currentTarget.style.transform = 'translateY(0)'; e.currentTarget.style.boxShadow = '0 2px 8px rgba(0,0,0,0.08)'; }}
     >
-      {/* Color accent bar */}
-      <div style={{ height: 4, background: color }} />
+      {/* Card body */}
+      <div style={{ padding: '20px 22px' }}>
 
-      {/* Fixed-height tile body */}
-      <div style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 14, height: 170, boxSizing: 'border-box' }}>
+        {/* Label */}
+        <div style={{ fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.65)', textTransform: 'uppercase', letterSpacing: '1.2px', marginBottom: 10 }}>
+          Workspace
+        </div>
 
-        {/* Workspace name */}
-        <div style={{ fontWeight: 800, fontSize: 16, color: '#1e293b' }}>{name}</div>
+        {/* Name */}
+        <div style={{ fontSize: 18, fontWeight: 900, color: 'white', marginBottom: 16, lineHeight: 1.2 }}>
+          {name}
+        </div>
 
         {/* Stats row */}
-        <div style={{ display: 'flex', gap: 0 }}>
+        <div style={{ display: 'flex', gap: 0, marginBottom: 16 }}>
           {[
-            { label: 'Boards',   value: boards.length   },
-            { label: 'Releases', value: totalReleases    },
-            { label: 'Tasks',    value: totalTasks       },
-            { label: 'Done',     value: completedTasks, highlight: '#16a34a' },
+            { label: 'Boards',   value: boards.length  },
+            { label: 'Releases', value: totalReleases  },
+            { label: 'Tasks',    value: totalTasks     },
           ].map((s, i) => (
-            <div key={s.label} style={{ flex: 1, textAlign: 'center', borderLeft: i > 0 ? '1px solid #f1f5f9' : 'none' }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: s.highlight || '#1e293b' }}>{s.value}</div>
-              <div style={{ fontSize: 10, color: '#94a3b8', fontWeight: 500, marginTop: 1 }}>{s.label}</div>
+            <div key={s.label} style={{ flex: 1, textAlign: 'center', borderLeft: i > 0 ? '1px solid rgba(255,255,255,0.2)' : 'none' }}>
+              <div style={{ fontSize: 20, fontWeight: 900, color: 'white' }}>{s.value}</div>
+              <div style={{ fontSize: 10, color: 'rgba(255,255,255,0.65)', fontWeight: 600 }}>{s.label}</div>
             </div>
           ))}
         </div>
 
-        {/* Progress bar + % */}
+        {/* Completion bar */}
         <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 5 }}>
-            <div style={{ fontSize: 11, color: '#94a3b8' }}>Overall progress</div>
-            <div style={{ fontSize: 13, fontWeight: 800, color: completionColor }}>{completion}%</div>
+            <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.7)' }}>{completedTasks} of {totalTasks} done</div>
+            <div style={{ fontSize: 13, fontWeight: 900, color: 'white' }}>{completion}%</div>
           </div>
-          <ReleaseProgressBar
-            statusCounts={overallStatusCounts}
-            total={totalTasks}
-            colorMap={mergedColorMap}
-            completion={completion}
-          />
+          <div style={{ height: 7, borderRadius: 4, background: 'rgba(255,255,255,0.25)', overflow: 'hidden' }}>
+            <div style={{ width: `${completion}%`, height: '100%', background: 'white', borderRadius: 4, opacity: 0.9 }} />
+          </div>
         </div>
       </div>
 
-      {/* Footer toggle */}
-      <div style={{ padding: '8px 20px', borderTop: '1px solid #f1f5f9', background: isExpanded ? `${color}10` : '#f8fafc', fontSize: 12, fontWeight: 600, color: isExpanded ? color : '#64748b', textAlign: 'center' }}>
-        {isExpanded ? '▴ Collapse' : `▾ View ${boards.length} board${boards.length !== 1 ? 's' : ''}`}
+      {/* Footer */}
+      <div style={{ padding: '8px 22px', background: 'rgba(0,0,0,0.12)', fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.8)', textAlign: 'center' }}>
+        Click to explore boards →
       </div>
     </div>
   );

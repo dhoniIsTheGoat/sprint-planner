@@ -2,6 +2,45 @@ import { useState } from 'react';
 import ReleaseProgressBar from './ReleaseProgressBar';
 import StatusLegend from './StatusLegend';
 
+const MONDAY_BASE = 'https://veritasprime-products.monday.com';
+
+function ReleaseItems({ items, boardId, colorMap }) {
+  const [open, setOpen] = useState(false);
+  if (!items || items.length === 0) return null;
+  return (
+    <div style={{ marginTop: 6 }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px 0', fontSize: 11, color: '#6366f1', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 4 }}
+      >
+        {open ? '▴' : '▾'} {open ? 'Hide' : 'Show'} {items.length} task{items.length !== 1 ? 's' : ''}
+      </button>
+      {open && (
+        <div style={{ marginTop: 4, borderLeft: '2px solid #e2e8f0', paddingLeft: 10 }}>
+          {items.map(item => {
+            const dotColor = colorMap[item.statusLabel] || '#94a3b8';
+            return (
+              <a
+                key={item.id}
+                href={`${MONDAY_BASE}/boards/${boardId}/pulses/${item.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', textDecoration: 'none', color: '#374151' }}
+                onMouseEnter={e => e.currentTarget.style.color = '#6366f1'}
+                onMouseLeave={e => e.currentTarget.style.color = '#374151'}
+              >
+                <span style={{ width: 7, height: 7, borderRadius: '50%', background: dotColor, flexShrink: 0 }} />
+                <span style={{ fontSize: 11, flex: 1, minWidth: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{item.name}</span>
+                <span style={{ fontSize: 10, color: '#94a3b8', flexShrink: 0 }}>↗</span>
+              </a>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function BoardCard({ board, hideCompleted }) {
   const [expanded, setExpanded] = useState(false);
 
@@ -36,9 +75,17 @@ export default function BoardCard({ board, hideCompleted }) {
       <div style={{ padding: '16px 18px', display: 'flex', flexDirection: 'column', gap: 12, height: 160, boxSizing: 'border-box' }}>
 
         {/* Board name */}
-        <div style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
-          {displayName}
-        </div>
+        <a
+          href={`${MONDAY_BASE}/boards/${board.id}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{ fontWeight: 700, fontSize: 14, color: '#1e293b', lineHeight: 1.3, display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', textDecoration: 'none' }}
+          onMouseEnter={e => e.currentTarget.style.color = '#6366f1'}
+          onMouseLeave={e => e.currentTarget.style.color = '#1e293b'}
+          title="Open board in Monday.com"
+        >
+          {displayName} ↗
+        </a>
 
         {/* Completion % + stats row */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
@@ -116,6 +163,7 @@ export default function BoardCard({ board, hideCompleted }) {
                   />
                 </div>
                 <StatusLegend statusCounts={release.statusCounts} colorMap={board.colorMap} />
+                <ReleaseItems items={release.items} boardId={board.id} colorMap={board.colorMap} />
               </div>
             ))
           )}
