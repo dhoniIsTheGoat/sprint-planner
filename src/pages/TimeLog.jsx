@@ -1,5 +1,4 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useTimeData } from '../hooks/useTimeData';
 import SummaryCards  from '../components/SummaryCards';
 import TimeLogTable  from '../components/TimeLogTable';
@@ -29,17 +28,15 @@ function offsetWeek(weekStart, delta) {
 }
 
 export default function TimeLog() {
-  const { entries, users, status, errorMsg, mappings, refresh } = useTimeData();
+  const { entries, users, status, progress, errorMsg, refresh } = useTimeData();
 
-  const [productFilter, setProductFilter] = useState('');
-  const [personFilter,  setPersonFilter]  = useState('');
-  const [weekStart,     setWeekStart]     = useState(() => getWeekStart(new Date()));
-  const [allTime,       setAllTime]       = useState(false);
-  const [view,          setView]          = useState('table');
+  const [workspaceFilter, setWorkspaceFilter] = useState('');
+  const [personFilter,    setPersonFilter]    = useState('');
+  const [weekStart,       setWeekStart]       = useState(() => getWeekStart(new Date()));
+  const [allTime,         setAllTime]         = useState(false);
+  const [view,            setView]            = useState('table');
 
-  const hasMappings = Object.values(mappings).some(v => v.productName);
-
-  const products = useMemo(() => [...new Set(entries.map(e => e.productName))].sort(), [entries]);
+  const workspaces = useMemo(() => [...new Set(entries.map(e => e.workspaceName).filter(Boolean))].sort(), [entries]);
   const userList  = useMemo(() => {
     const seen = new Set();
     return entries
@@ -53,8 +50,8 @@ export default function TimeLog() {
     weekEnd.setDate(weekEnd.getDate() + 7);
 
     return entries.filter(e => {
-      if (productFilter && e.productName !== productFilter) return false;
-      if (personFilter  && e.userId      !== personFilter)  return false;
+      if (workspaceFilter && e.workspaceName !== workspaceFilter) return false;
+      if (personFilter    && e.userId        !== personFilter)    return false;
       if (!allTime && e.startedAt) {
         const d = new Date(e.startedAt);
         if (d < weekStart || d >= weekEnd) return false;
@@ -86,7 +83,7 @@ export default function TimeLog() {
     lineHeight: 1,
   };
 
-  const hasActiveFilters = productFilter || personFilter || !allTime;
+  const hasActiveFilters = workspaceFilter || personFilter || !allTime;
 
   return (
     <div style={{ padding: 24, fontFamily: 'system-ui,-apple-system,sans-serif', maxWidth: 1200, margin: '0 auto' }}>
@@ -103,15 +100,22 @@ export default function TimeLog() {
           </button>
         </div>
         <p style={{ margin: '6px 0 0', fontSize: 13, color: '#64748b' }}>
-          Time tracked by team members across mapped Monday.com boards.
+          Time tracked by team members across all Monday.com boards.
         </p>
       </div>
 
       {status === 'loading' && (
         <div style={{ textAlign: 'center', padding: 60, color: '#64748b' }}>
           <div style={{ fontSize: 32, marginBottom: 10 }}>⏳</div>
-          <div>Fetching time tracking data from Monday.com…</div>
-          <div style={{ fontSize: 12, color: '#94a3b8', marginTop: 6 }}>This may take a moment for large boards.</div>
+          <div style={{ fontWeight: 600, marginBottom: 12 }}>Scanning boards for time tracking data…</div>
+          {progress.total > 0 && (
+            <>
+              <div style={{ background: '#e2e8f0', borderRadius: 99, height: 8, width: 300, margin: '0 auto 8px' }}>
+                <div style={{ background: '#6366f1', height: 8, borderRadius: 99, width: `${Math.round((progress.done / progress.total) * 100)}%`, transition: 'width 0.3s' }} />
+              </div>
+              <div style={{ fontSize: 12, color: '#94a3b8' }}>{progress.done} / {progress.total} boards scanned</div>
+            </>
+          )}
         </div>
       )}
 
@@ -127,20 +131,7 @@ VITE_MONDAY_API_TOKEN=your_token_here`}
         </div>
       )}
 
-      {status === 'ready' && !hasMappings && (
-        <div style={{ textAlign: 'center', padding: 64, color: '#94a3b8' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🗂️</div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: '#475569', marginBottom: 8 }}>No Boards Mapped Yet</div>
-          <div style={{ fontSize: 14, marginBottom: 20 }}>
-            Link your Monday.com boards to products before viewing time data.
-          </div>
-          <Link to="/board-mapping" style={{ padding: '8px 20px', background: '#6366f1', color: 'white', borderRadius: 6, textDecoration: 'none', fontSize: 13, fontWeight: 600 }}>
-            Go to Board Mapping
-          </Link>
-        </div>
-      )}
-
-      {status === 'ready' && hasMappings && (
+      {status === 'ready' && (
         <>
           <SummaryCards entries={filtered} />
 
@@ -191,9 +182,9 @@ VITE_MONDAY_API_TOKEN=your_token_here`}
 
             <div style={{ width: 1, height: 24, background: '#e2e8f0' }} />
 
-            <select value={productFilter} onChange={e => setProductFilter(e.target.value)} style={selStyle}>
-              <option value="">All Products</option>
-              {products.map(p => <option key={p} value={p}>{p}</option>)}
+            <select value={workspaceFilter} onChange={e => setWorkspaceFilter(e.target.value)} style={selStyle}>
+              <option value="">All Workspaces</option>
+              {workspaces.map(w => <option key={w} value={w}>{w}</option>)}
             </select>
 
             <select value={personFilter} onChange={e => setPersonFilter(e.target.value)} style={selStyle}>
@@ -201,9 +192,9 @@ VITE_MONDAY_API_TOKEN=your_token_here`}
               {userList.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
             </select>
 
-            {hasActiveFilters && (productFilter || personFilter) && (
+            {hasActiveFilters && (workspaceFilter || personFilter) && (
               <button
-                onClick={() => { setProductFilter(''); setPersonFilter(''); }}
+                onClick={() => { setWorkspaceFilter(''); setPersonFilter(''); }}
                 style={{ ...navBtnStyle, fontSize: 12, color: '#94a3b8' }}
               >
                 Clear
