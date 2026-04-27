@@ -58,7 +58,7 @@ export default function TimeLog() {
       }
       return true;
     });
-  }, [entries, productFilter, personFilter, weekStart, allTime]);
+  }, [entries, workspaceFilter, personFilter, weekStart, allTime]);
 
   const selStyle = {
     padding: '6px 10px',

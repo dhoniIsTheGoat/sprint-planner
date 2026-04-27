@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, useEffect } from 'react';
+import { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { useTeamWorkload } from '../hooks/useTeamWorkload';
 
 /* ── Palette for user tiles ── */
@@ -52,6 +52,32 @@ function StatusBadge({ status }) {
 /* ── Filter helpers ── */
 // A filter is { selected: Set<string>, mode: 'include' | 'exclude' }
 const emptyFilter = () => ({ selected: new Set(), mode: 'include' });
+
+const FILTER_STORAGE_KEY = 'teamWorkloadFilters_v1';
+
+function serializeFilters(search, statuses, boards, sprints, showEmpty) {
+  return JSON.stringify({
+    search,
+    statuses: { selected: [...statuses.selected], mode: statuses.mode },
+    boards:   { selected: [...boards.selected],   mode: boards.mode   },
+    sprints:  { selected: [...sprints.selected],  mode: sprints.mode  },
+    showEmpty,
+  });
+}
+
+function loadFilters() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(FILTER_STORAGE_KEY));
+    if (!raw) return null;
+    return {
+      search:    raw.search || '',
+      statuses:  { selected: new Set(raw.statuses?.selected || []), mode: raw.statuses?.mode || 'include' },
+      boards:    { selected: new Set(raw.boards?.selected   || []), mode: raw.boards?.mode   || 'include' },
+      sprints:   { selected: new Set(raw.sprints?.selected  || []), mode: raw.sprints?.mode  || 'include' },
+      showEmpty: raw.showEmpty || false,
+    };
+  } catch { return null; }
+}
 
 function passesFilter(value, filter) {
   if (filter.selected.size === 0) return true;
@@ -350,12 +376,21 @@ function FilterChip({ value, mode, onRemove }) {
 export default function TeamWorkload() {
   const { users, tasksByUser, allBoards, loading, progress, error, refresh } = useTeamWorkload();
 
-  const [globalSearch,   setGlobalSearch]   = useState('');
-  const [globalStatuses, setGlobalStatuses] = useState(emptyFilter);
-  const [globalBoards,   setGlobalBoards]   = useState(emptyFilter);
-  const [globalSprints,  setGlobalSprints]  = useState(emptyFilter);
-  const [showEmpty,      setShowEmpty]      = useState(false);
+  const saved = loadFilters();
+  const [globalSearch,   setGlobalSearch]   = useState(saved?.search    ?? '');
+  const [globalStatuses, setGlobalStatuses] = useState(saved?.statuses  ?? emptyFilter);
+  const [globalBoards,   setGlobalBoards]   = useState(saved?.boards    ?? emptyFilter);
+  const [globalSprints,  setGlobalSprints]  = useState(saved?.sprints   ?? emptyFilter);
+  const [showEmpty,      setShowEmpty]      = useState(saved?.showEmpty  ?? false);
   const [localFilters,   setLocalFilters]   = useState({});
+
+  /* ── Persist filters to localStorage whenever they change ── */
+  useEffect(() => {
+    localStorage.setItem(
+      FILTER_STORAGE_KEY,
+      serializeFilters(globalSearch, globalStatuses, globalBoards, globalSprints, showEmpty)
+    );
+  }, [globalSearch, globalStatuses, globalBoards, globalSprints, showEmpty]);
 
   /* ── Derive filter options ── */
   const { allStatuses, allBoardNames, allSprints } = useMemo(() => {
