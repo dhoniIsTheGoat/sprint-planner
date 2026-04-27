@@ -1,12 +1,13 @@
 import { NavLink } from 'react-router-dom';
 
 const NAV_LINKS = [
-  { to: '/',              label: 'Sprint Planner' },
-  { to: '/board-mapping', label: 'Board Mapping'  },
-  { to: '/time-log',      label: 'Hours Logged'   },
-  { to: '/dashboard',        label: 'Dashboard'       },
+  { to: '/',                label: 'Sprint Review'   },
+  { to: '/time-log',        label: 'Hours Logged'    },
+  { to: '/dashboard',       label: 'Dashboard'       },
   { to: '/quarterly-goals', label: 'Quarterly Goals' },
-  { to: '/setup',            label: 'Setup'           },
+  { to: '/team-workload',   label: 'Team Workload'   },
+  { to: '/product-leads',   label: 'Product Leads'   },
+  { to: '/setup',           label: 'Setup'           },
 ];
 
 export default function NavBar() {
@@ -23,7 +24,7 @@ export default function NavBar() {
       zIndex: 100,
     }}>
       <div style={{ fontSize: 15, fontWeight: 700, color: '#6366f1', marginRight: 28, whiteSpace: 'nowrap', padding: '14px 0' }}>
-        Sprint Planner
+        Planer
       </div>
       {NAV_LINKS.map(({ to, label }) => (
         <NavLink
